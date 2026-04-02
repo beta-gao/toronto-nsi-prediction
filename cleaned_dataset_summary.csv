@@ -1,0 +1,6 @@
+file_name,original_rows,duplicate_rows_removed,invalid_report_date_rows_removed,invalid_occ_date_rows_removed,cleaned_rows,trimmed_string_cells,repaired_report_parts,repaired_occ_parts,rows_with_report_parts_repaired,rows_with_occ_parts_repaired,rows_with_invalid_report_components_fixed,rows_with_invalid_occ_components_fixed,zero_coordinate_rows_remaining,nsa_neighbourhood_rows_remaining
+Assault_Open_Data_8153726331132086508.csv,248685,20522,0,0,228163,497231,0,695,0,139,0,139,3800,4038
+Robbery_Open_Data_1445483808884001275.csv,39647,5752,0,0,33895,79292,0,10,0,2,0,2,927,970
+Break_and_Enter_Open_Data_1917561619063639397.csv,83129,253,0,0,82876,166256,0,10,0,2,0,2,565,569
+Auto_Theft_Open_Data_3636037395679683176.csv,76749,7193,0,0,69556,153492,0,30,0,6,0,6,768,799
+Theft_Over_Open_Data_7952014260427331473.csv,16337,17,0,0,16320,32670,0,20,0,4,0,4,287,298

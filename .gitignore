@@ -1,3 +1,5 @@
-﻿*.csv
-*.png
+﻿# Python virtual env & cache
+.venv/
+.pydeps/
 __pycache__/
+.codex-tmp/
