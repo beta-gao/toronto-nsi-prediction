@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def build_neighbour_map(df, k=5):
     centroids = df.groupby("neighbourhood_158")[["latitude_wgs84", "longitude_wgs84"]].first()
     names = centroids.index.tolist()
@@ -8,7 +9,7 @@ def build_neighbour_map(df, k=5):
     neighbour_map = {}
     for i, name in enumerate(names):
         distances = np.sqrt(np.sum((coords - coords[i]) ** 2, axis=1))
-        nearest_indices = np.argsort(distances)[1:k+1]
+        nearest_indices = np.argsort(distances)[1 : k + 1]
         neighbour_map[name] = [names[j] for j in nearest_indices]
     return neighbour_map
 
