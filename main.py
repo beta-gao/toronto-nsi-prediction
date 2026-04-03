@@ -1,12 +1,13 @@
 import pandas as pd
 import time
+from feature_engineering import engineer_features
+from evaluation import evaluate, plot_decile_chart, plot_feature_importance
+from sklearn.preprocessing import StandardScaler
+from neural_network import NeuralNetworkRegressor
 from sklearn.linear_model import Ridge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
-from feature_engineering import engineer_features
-from evaluation import evaluate, plot_decile_chart, plot_feature_importance
-from sklearn.preprocessing import StandardScaler
 
 NUMERIC_FEATURES = [
     "safety_lag_1", "safety_lag_2", "safety_lag_3",
@@ -25,7 +26,7 @@ def load_and_prepare(path):
     df["month"] = df["date"].dt.month.astype(str)
     df = engineer_features(df)
     return df
- 
+
  
 def split(df):
     categorical = pd.get_dummies(df[["neighbourhood_158", "month"]])
@@ -42,9 +43,15 @@ def split(df):
     return features[train], y[train], features[val], y[val], features[test], y[test]
  
  
-def train_and_evaluate(name, model, X_train, y_train, X_test, y_test):
+def train_and_evaluate(name, model, X_train, y_train, X_val, y_val, X_test, y_test):
     start = time.time()
-    model.fit(X_train, y_train)
+    if X_val is not None and y_val is not None:
+        try:
+            model.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+        except TypeError:
+            model.fit(X_train, y_train)
+    else:
+        model.fit(X_train, y_train)
     train_time = time.time() - start
 
     y_test_pred = model.predict(X_test)
@@ -67,15 +74,25 @@ def main():
     X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=feature_names)
  
     models = {
-        "Ridge": Ridge(alpha=1.0),
-        "KNN": KNeighborsRegressor(n_neighbors=5),
-        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
-        "XGBoost": XGBRegressor(n_estimators=100, random_state=42, verbosity=0),
+    "Neural Network": NeuralNetworkRegressor(
+        hidden_layers=(128, 64),
+        learning_rate=0.001,
+        epochs=300,
+        batch_size=256,
+        patience=25,
+        l2_lambda=1e-4,
+        random_state=42,
+        verbose=True,
+    ),
+    "Ridge": Ridge(alpha=1.0),
+    "KNN": KNeighborsRegressor(n_neighbors=5),
+    "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
+    "XGBoost": XGBRegressor(n_estimators=100, random_state=42, verbosity=0),
     }
  
     all_results = []
     for name, model in models.items():
-        result, y_test_pred = train_and_evaluate(name, model, X_train_scaled, y_train, X_test_scaled, y_test)
+        result, y_test_pred = train_and_evaluate(name, model, X_train_scaled, y_train, X_val, y_val, X_test_scaled, y_test)
         plot_decile_chart(y_test, y_test_pred, name, save_path=f"results/decile_{name}.png")
         plot_feature_importance(model, feature_names, name, save_path=f"results/importance_{name}.png")
         all_results.append(result)
