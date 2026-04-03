@@ -35,3 +35,27 @@ def plot_decile_chart(y_true, y_pred, model_name, save_path=None):
     if save_path:
         plt.savefig(save_path, dpi=150)
     plt.show()
+
+def plot_feature_importance(model, feature_names, model_name, top_n=15, save_path=None):
+    if hasattr(model, "coef_"):
+        importances = np.abs(model.coef_)
+    elif hasattr(model, "feature_importances_"):
+        importances = model.feature_importances_
+    else:
+        print(f"No feature importance available for {model_name}")
+        return
+
+    indices = np.argsort(importances)[-top_n:]
+    top_names = [feature_names[i] for i in indices]
+    top_values = importances[indices]
+
+    plt.figure(figsize=(8, 5))
+    plt.barh(range(top_n), top_values, color="indianred")
+    plt.yticks(range(top_n), top_names, fontsize=8)
+    plt.xlabel("Importance (|coefficient| for Ridge, impurity for trees)")
+    plt.title(f"Top {top_n} Features — {model_name}")
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+    plt.show()

@@ -5,7 +5,8 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from feature_engineering import engineer_features
-from evaluation import evaluate, plot_decile_chart
+from evaluation import evaluate, plot_decile_chart, plot_feature_importance
+from sklearn.preprocessing import StandardScaler
 
 NUMERIC_FEATURES = [
     "safety_lag_1", "safety_lag_2", "safety_lag_3",
@@ -13,13 +14,13 @@ NUMERIC_FEATURES = [
     "safety_roll_3", "safety_roll_6", "safety_roll_12",
     "crime_score_roll_3", "crime_score_roll_6", "crime_score_roll_12",
     "safety_mom_change", "crime_score_mom_change",
-    "safety_alltime_mean", "safety_alltime_std",
+    "safety_alltime_mean", "safety_alltime_std", "spatial_neighbour_safety"
 ]
  
  
 def load_and_prepare(path):
     df = pd.read_csv(path)
-    df["date"] = pd.to_datetime(df["occ_month"], format="%Y-%m")
+    df["date"] = pd.to_datetime(df["occ_month"], format="%b-%y")
     df = df.sort_values(["neighbourhood_158", "date"]).reset_index(drop=True)
     df["month"] = df["date"].dt.month.astype(str)
     df = engineer_features(df)
@@ -57,8 +58,13 @@ def train_and_evaluate(name, model, X_train, y_train, X_test, y_test):
 
  
 def main():
-    df = load_and_prepare("monthly_safety_index_global_from_2014.csv")
+    df = load_and_prepare("data/monthly_neighbourhood_safety_from_cleaned.csv")
     X_train, y_train, X_val, y_val, X_test, y_test = split(df)
+    feature_names = X_train.columns.tolist()
+    
+    scaler = StandardScaler()
+    X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=feature_names)
+    X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=feature_names)
  
     models = {
         "Ridge": Ridge(alpha=1.0),
@@ -69,10 +75,9 @@ def main():
  
     all_results = []
     for name, model in models.items():
-        result, y_test_pred = train_and_evaluate(
-            name, model, X_train, y_train, X_test, y_test
-        )
-        plot_decile_chart(y_test, y_test_pred, name, save_path=f"decile_{name}.png")
+        result, y_test_pred = train_and_evaluate(name, model, X_train_scaled, y_train, X_test_scaled, y_test)
+        plot_decile_chart(y_test, y_test_pred, name, save_path=f"results/decile_{name}.png")
+        plot_feature_importance(model, feature_names, name, save_path=f"results/importance_{name}.png")
         all_results.append(result)
  
     print("\n\nSummary")

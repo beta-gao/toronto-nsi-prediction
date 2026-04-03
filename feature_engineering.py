@@ -1,5 +1,36 @@
 import numpy as np
 
+def build_neighbour_map(df, k=5):
+    centroids = df.groupby("neighbourhood_158")[["latitude_wgs84", "longitude_wgs84"]].first()
+    names = centroids.index.tolist()
+    coords = centroids.values
+
+    neighbour_map = {}
+    for i, name in enumerate(names):
+        distances = np.sqrt(np.sum((coords - coords[i]) ** 2, axis=1))
+        nearest_indices = np.argsort(distances)[1:k+1]
+        neighbour_map[name] = [names[j] for j in nearest_indices]
+    return neighbour_map
+
+
+def add_spatial_features(df, k=5):
+    neighbour_map = build_neighbour_map(df, k)
+    prev_safety = df.groupby("neighbourhood_158")["safety_index"].shift(1)
+
+    lookup = df.assign(prev_safety=prev_safety).pivot_table(
+        index="date", columns="neighbourhood_158", values="prev_safety"
+    )
+
+    def compute_spatial_avg(row):
+        neighbours = neighbour_map[row["neighbourhood_158"]]
+        date = row["date"]
+        if date in lookup.index:
+            return lookup.loc[date, neighbours].mean()
+        return np.nan
+
+    df["spatial_neighbour_safety"] = df.apply(compute_spatial_avg, axis=1)
+    return df
+
 
 def add_lag_features(df):
     g = df.groupby("neighbourhood_158")
@@ -39,11 +70,12 @@ def add_longterm_features(df):
     return df
 
 
-def fill_nans(df):
+def fill_nans(df, cutoff="2021-12-31"):
+    train = df[df["date"] <= cutoff]
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     for col in numeric_cols:
-        neighbourhood_avg = df.groupby("neighbourhood_158")[col].transform("mean")
-        df[col] = df[col].fillna(neighbourhood_avg)
+        fill_values = train.groupby("neighbourhood_158")[col].mean()
+        df[col] = df[col].fillna(df["neighbourhood_158"].map(fill_values))
     return df
 
 
@@ -52,5 +84,6 @@ def engineer_features(df):
     df = add_rolling_features(df)
     df = add_trend_features(df)
     df = add_longterm_features(df)
+    df = add_spatial_features(df)
     df = fill_nans(df)
     return df
