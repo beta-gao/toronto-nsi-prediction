@@ -1,11 +1,22 @@
 import pandas as pd
 import time
-from sklearn.linear_model import Ridge
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
 from feature_engineering import engineer_features
 from evaluation import evaluate, plot_decile_chart
+from neural_network import NeuralNetworkRegressor
+
+try:
+    from sklearn.linear_model import Ridge
+    from sklearn.neighbors import KNeighborsRegressor
+    from sklearn.ensemble import RandomForestRegressor
+except ImportError:
+    Ridge = None
+    KNeighborsRegressor = None
+    RandomForestRegressor = None
+
+try:
+    from xgboost import XGBRegressor
+except ImportError:
+    XGBRegressor = None
 
 NUMERIC_FEATURES = [
     "safety_lag_1", "safety_lag_2", "safety_lag_3",
@@ -19,11 +30,20 @@ NUMERIC_FEATURES = [
  
 def load_and_prepare(path):
     df = pd.read_csv(path)
-    df["date"] = pd.to_datetime(df["occ_month"], format="%Y-%m")
+    df["date"] = parse_occ_month(df["occ_month"])
     df = df.sort_values(["neighbourhood_158", "date"]).reset_index(drop=True)
     df["month"] = df["date"].dt.month.astype(str)
     df = engineer_features(df)
     return df
+
+
+def parse_occ_month(month_series):
+    parsed = pd.to_datetime(month_series, format="%b-%y", errors="coerce")
+    if parsed.isna().any():
+        parsed = parsed.fillna(pd.to_datetime(month_series, errors="coerce"))
+    if parsed.isna().any():
+        raise ValueError("Could not parse one or more occ_month values.")
+    return parsed
  
  
 def split(df):
@@ -41,9 +61,15 @@ def split(df):
     return features[train], y[train], features[val], y[val], features[test], y[test]
  
  
-def train_and_evaluate(name, model, X_train, y_train, X_test, y_test):
+def train_and_evaluate(name, model, X_train, y_train, X_val, y_val, X_test, y_test):
     start = time.time()
-    model.fit(X_train, y_train)
+    if X_val is not None and y_val is not None:
+        try:
+            model.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+        except TypeError:
+            model.fit(X_train, y_train)
+    else:
+        model.fit(X_train, y_train)
     train_time = time.time() - start
 
     y_test_pred = model.predict(X_test)
@@ -57,20 +83,46 @@ def train_and_evaluate(name, model, X_train, y_train, X_test, y_test):
 
  
 def main():
-    df = load_and_prepare("monthly_safety_index_global_from_2014.csv")
+    df = load_and_prepare("monthly_neighbourhood_safety_from_cleaned.csv")
     X_train, y_train, X_val, y_val, X_test, y_test = split(df)
  
     models = {
-        "Ridge": Ridge(alpha=1.0),
-        "KNN": KNeighborsRegressor(n_neighbors=5),
-        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
-        "XGBoost": XGBRegressor(n_estimators=100, random_state=42, verbosity=0),
+        "Neural Network": NeuralNetworkRegressor(
+            hidden_layers=(128, 64),
+            learning_rate=0.001,
+            epochs=300,
+            batch_size=256,
+            patience=25,
+            l2_lambda=1e-4,
+            random_state=42,
+            verbose=True,
+        ),
     }
+
+    if Ridge is not None:
+        models["Ridge"] = Ridge(alpha=1.0)
+    else:
+        print("Skipping Ridge: scikit-learn is not installed.")
+
+    if KNeighborsRegressor is not None:
+        models["KNN"] = KNeighborsRegressor(n_neighbors=5)
+    else:
+        print("Skipping KNN: scikit-learn is not installed.")
+
+    if RandomForestRegressor is not None:
+        models["Random Forest"] = RandomForestRegressor(n_estimators=100, random_state=42)
+    else:
+        print("Skipping Random Forest: scikit-learn is not installed.")
+
+    if XGBRegressor is not None:
+        models["XGBoost"] = XGBRegressor(n_estimators=100, random_state=42, verbosity=0)
+    else:
+        print("Skipping XGBoost: xgboost is not installed.")
  
     all_results = []
     for name, model in models.items():
         result, y_test_pred = train_and_evaluate(
-            name, model, X_train, y_train, X_test, y_test
+            name, model, X_train, y_train, X_val, y_val, X_test, y_test
         )
         plot_decile_chart(y_test, y_test_pred, name, save_path=f"decile_{name}.png")
         all_results.append(result)
