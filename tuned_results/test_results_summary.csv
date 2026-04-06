@@ -1,0 +1,6 @@
+model,rmse,mae,r2,spearman,fit_seconds,best_params,tuned_param_summary
+Random Forest,0.048191981472366884,0.0353895874894117,0.843314908957487,0.8501589945546133,5.888949871063232,"{'max_depth': 10, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 200}","n_estimators=200, max_depth=10, min_samples_split=2, min_samples_leaf=1"
+Ridge,0.04893943115593568,0.0351463244571792,0.8384168977429852,0.8571164615113853,0.13599395751953125,{'model__alpha': 100.0},alpha=100.0
+XGBoost,0.049012911143534975,0.035202498093932444,0.8379313163822699,0.8563770427577234,0.5243673324584961,"{'colsample_bytree': 1.0, 'learning_rate': 0.03, 'max_depth': 3, 'n_estimators': 200, 'subsample': 1.0}","n_estimators=200, max_depth=3, learning_rate=0.03, subsample=1.0, colsample_bytree=1.0"
+KNN,0.05605590367666847,0.04039011025304817,0.7880073399798929,0.8366402846238518,0.13064122200012207,"{'model__n_neighbors': 21, 'model__p': 1, 'model__weights': 'distance'}","k=21, p=1, weights=distance"
+Neural Network,0.05943731545027686,0.04416179750965236,0.76166024998548,0.7660744191709813,96.39007067680359,"{'batch_size': 128, 'epochs': 250, 'hidden_layers': (128, 64), 'l2_lambda': 0.001, 'learning_rate': 0.003, 'patience': 20}","hidden_layers=(128, 64), lr=0.003, batch_size=128, l2=0.001"

@@ -4,6 +4,7 @@ import copy
 from dataclasses import dataclass
 
 import numpy as np
+from sklearn.base import BaseEstimator, RegressorMixin
 
 
 @dataclass
@@ -12,7 +13,7 @@ class TrainingHistory:
     val_loss: list[float]
 
 
-class NeuralNetworkRegressor:
+class NeuralNetworkRegressor(BaseEstimator, RegressorMixin):
     def __init__(
         self,
         hidden_layers: tuple[int, ...] = (128, 64),

@@ -13,9 +13,10 @@ from xgboost import XGBRegressor
 
 from evaluation import evaluate, plot_decile_chart, plot_feature_importance
 from feature_engineering import engineer_features
+from neural_network import NeuralNetworkRegressor
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_PATH = BASE_DIR.parent / "monthly_neighbourhood_safety_from_cleaned.csv"
+DATA_PATH = BASE_DIR / "data" / "monthly_neighbourhood_safety_from_cleaned.csv"
 OUTPUT_DIR = BASE_DIR / "tuned_results"
 
 NUMERIC_FEATURES = [
@@ -77,12 +78,32 @@ MODEL_CONFIGS = {
             "colsample_bytree": [0.8, 1.0],
         },
     },
+    "Neural Network": {
+        "estimator": NeuralNetworkRegressor(
+            random_state=42,
+            verbose=False,
+        ),
+        "param_grid": {
+            "hidden_layers": [(128, 64), (256, 128)],
+            "learning_rate": [0.001, 0.003],
+            "epochs": [250],
+            "batch_size": [128, 256],
+            "patience": [20],
+            "l2_lambda": [1e-4, 1e-3],
+        },
+    },
 }
 
 
 def load_and_prepare(path):
     df = pd.read_csv(path)
-    df["date"] = pd.to_datetime(df["occ_month"], format="%b-%y")
+    try:
+        df["date"] = pd.to_datetime(df["occ_month"], format="%Y-%m")
+    except ValueError as exc:
+        raise ValueError(
+            "Expected occ_month values in YYYY-MM format, "
+            "for example 2014-01."
+        ) from exc
     df = df.sort_values(["neighbourhood_158", "date"]).reset_index(drop=True)
     df["month"] = df["date"].dt.month.astype(str)
     df = engineer_features(df)
@@ -115,7 +136,10 @@ def tune_model(name, estimator, param_grid, X_train, y_train, X_val, y_val):
         candidate.set_params(**params)
 
         start = time.time()
-        candidate.fit(X_train, y_train)
+        if name == "Neural Network":
+            candidate.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+        else:
+            candidate.fit(X_train, y_train)
         fit_seconds = time.time() - start
 
         y_val_pred = candidate.predict(X_val)
@@ -129,7 +153,6 @@ def tune_model(name, estimator, param_grid, X_train, y_train, X_val, y_val):
                 "val_mae": val_metrics["mae"],
                 "val_r2": val_metrics["r2"],
                 "val_spearman": val_metrics["spearman"],
-                "val_kendall": val_metrics["kendall"],
             }
         )
 
@@ -182,6 +205,13 @@ def summarize_params(model_name, best_params):
             f"subsample={best_params['subsample']}, "
             f"colsample_bytree={best_params['colsample_bytree']}"
         )
+    if model_name == "Neural Network":
+        return (
+            f"hidden_layers={best_params['hidden_layers']}, "
+            f"lr={best_params['learning_rate']}, "
+            f"batch_size={best_params['batch_size']}, "
+            f"l2={best_params['l2_lambda']}"
+        )
     return str(best_params)
 
 
@@ -225,7 +255,7 @@ def main():
         print(f"{name} best params: {best_params}")
         print(
             f"  Test RMSE={result['rmse']:.4f}  MAE={result['mae']:.4f}  "
-            f"R2={result['r2']:.4f}  Spearman={result['spearman']:.4f}  Kendall={result['kendall']:.4f}"
+            f"R2={result['r2']:.4f}  Spearman={result['spearman']:.4f}"
         )
 
         safe_name = name.lower().replace(" ", "_")
